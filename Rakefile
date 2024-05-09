@@ -5,4 +5,14 @@ require "minitest/test_task"
 
 Minitest::TestTask.create
 
-task default: :test
+require "rake/extensiontask"
+
+task build: :compile
+
+GEMSPEC = Gem::Specification.load("gvl_timing.gemspec")
+
+Rake::ExtensionTask.new("gvl_timing", GEMSPEC) do |ext|
+  ext.lib_dir = "lib/gvl_timing"
+end
+
+task default: %i[clobber compile test]
