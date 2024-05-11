@@ -29,7 +29,7 @@ module GVLTiming
     end
 
     def inspect
-      "#<#{self.class} total=%.2f running=%.2f idle=%.2f stalled=%.2f>" % [
+      "#<#{self.class} total=%.2fs running=%.2fs idle=%.2fs stalled=%.2fs>" % [
         duration / NANOSECONDS_PER_SECOND_F,
         running_duration / NANOSECONDS_PER_SECOND_F,
         idle_duration / NANOSECONDS_PER_SECOND_F,
