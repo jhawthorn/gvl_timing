@@ -3,7 +3,16 @@
 require_relative "gvl_timing/version"
 require_relative "gvl_timing/gvl_timing"
 
-module GvlTiming
+module GVLTiming
   class Error < StandardError; end
-  # Your code goes here...
+
+  class Timer
+    def duration
+      monotonic_stop - monotonic_start
+    end
+
+    def cpu_duration
+      cputime_stop - cputime_start
+    end
+  end
 end

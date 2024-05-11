@@ -4,7 +4,7 @@ require_relative "lib/gvl_timing/version"
 
 Gem::Specification.new do |spec|
   spec.name = "gvl_timing"
-  spec.version = GvlTiming::VERSION
+  spec.version = GVLTiming::VERSION
   spec.authors = ["John Hawthorn"]
   spec.email = ["john@hawthorn.email"]
 
