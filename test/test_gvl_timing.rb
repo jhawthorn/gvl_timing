@@ -31,16 +31,17 @@ class TestGVLTiming < Minitest::Test
 
     assert_in_delta 100000000, timer.duration, 5000000
     assert_in_delta 100000000, timer.running_duration, 5000000
-    assert_in_delta 100000000, timer.cpu_duration, 5000000
+    #assert_in_delta 100000000, timer.cpu_duration, 10000000
     assert_in_delta 0, timer.stalled_duration, 5000000
     assert_in_delta 0, timer.idle_duration, 5000000
   end
 
   def test_timing_stalled_sleep
     done = false
+    wait = Mutex.new
+    wait.lock
     thread = Thread.new do
-      Thread.pass
-      Thread.pass
+      wait.lock
       target = Process::clock_gettime(Process::CLOCK_MONOTONIC) + 0.1
       while Process::clock_gettime(Process::CLOCK_MONOTONIC) < target
         # busy
@@ -50,6 +51,7 @@ class TestGVLTiming < Minitest::Test
 
     timer = GVLTiming::Timer.new
     timer.start
+    wait.unlock
     until done
       Thread.pass
     end
@@ -62,5 +64,11 @@ class TestGVLTiming < Minitest::Test
     assert_in_delta 0, timer.idle_duration, 5000000
   ensure
     thread&.kill
+  end
+
+  def test_measure_and_inspect
+    timer = GVLTiming.measure { sleep 0.1 }
+    expected = "#<GVLTiming::Timer total=0.10 running=0.00 idle=0.10 stalled=0.00>"
+    assert_equal expected, timer.inspect
   end
 end

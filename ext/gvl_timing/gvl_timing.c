@@ -45,6 +45,7 @@ void record_timing(struct gvl_timer *timer, enum ruby_gvl_state new_state) {
 void internal_thread_event_cb(rb_event_flag_t event, const rb_internal_thread_event_data_t *event_data, void *data) {
     struct gvl_timer *timer = data;
 
+    if (!ruby_native_thread_p()) return;
     VALUE thread = rb_thread_current();
 //#if HAVE_RB_INTERNAL_THREAD_EVENT_DATA_T_THREAD
 //#else
