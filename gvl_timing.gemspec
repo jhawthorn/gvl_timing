@@ -8,7 +8,7 @@ Gem::Specification.new do |spec|
   spec.authors = ["John Hawthorn"]
   spec.email = ["john@hawthorn.email"]
 
-  spec.summary = "Report time spent in different GVL states"
+  spec.summary = "Measure time spent in different GVL states"
   spec.description = spec.summary
   spec.homepage = "https://github.com/jhawthorn/gvl_timing"
   spec.license = "MIT"
