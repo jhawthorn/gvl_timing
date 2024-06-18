@@ -1,24 +1,30 @@
-# GvlTiming
+# gvl\_timing
 
-TODO: Delete this and the text below, and describe your gem
+Measures timings for the current thread's GVL state for CRuby.
 
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/gvl_timing`. To experiment with that code, run `bin/console` for an interactive prompt.
+This will add some (small) overhead to all GVL activity, so may be better to
+development/test or sampled use rather than continuous timing.
 
 ## Installation
 
-TODO: Replace `UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG` with your gem name right after releasing it to RubyGems.org. Please do not do it earlier due to security reasons. Alternatively, replace this section with instructions to install your gem from git if you don't plan to release to RubyGems.org.
-
 Install the gem and add to the application's Gemfile by executing:
 
-    $ bundle add UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG
-
-If bundler is not being used to manage dependencies, install the gem by executing:
-
-    $ gem install UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG
+    $ bundle add gvl_timing
 
 ## Usage
 
-TODO: Write usage instructions here
+```
+>> timer = GVLTiming.measure { sleep 0.1 }
+=> #<GVLTiming::Timer total=0.10s running=0.00s idle=0.10s stalled=0.00s>
+>> timer.duration
+=> 0.101082
+>> timer.cpu_duration
+=> 7.4667e-05
+>> timer.idle_duration
+=> 0.101048
+>> timer.stalled_duration
+=> 1.0e-06
+```
 
 ## Development
 
