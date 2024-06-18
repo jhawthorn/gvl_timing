@@ -20,21 +20,58 @@ module GVLTiming
   class Timer
     NANOSECONDS_PER_SECOND_F = 1000000000.0
 
-    def duration
-      monotonic_stop - monotonic_start
+    def duration_ns
+      monotonic_stop_ns - monotonic_start_ns
     end
 
-    def cpu_duration
-      cputime_stop - cputime_start
+    def cpu_duration_ns
+      cputime_stop_ns - cputime_start_ns
     end
+
+    [
+      :duration, :cpu_duration,
+      :monotonic_start, :monotonic_stop,
+      :cputime_start, :cputime_start,
+      :running_duration, :stalled_duration, :idle_duration
+    ].each do |name|
+      class_eval <<~RUBY
+        def #{name}(unit = :float_second)
+          scale_ns(#{name}_ns, unit)
+        end
+      RUBY
+    end
+
 
     def inspect
       "#<#{self.class} total=%.2fs running=%.2fs idle=%.2fs stalled=%.2fs>" % [
-        duration / NANOSECONDS_PER_SECOND_F,
-        running_duration / NANOSECONDS_PER_SECOND_F,
-        idle_duration / NANOSECONDS_PER_SECOND_F,
-        stalled_duration / NANOSECONDS_PER_SECOND_F
+        duration,
+        running_duration,
+        idle_duration,
+        stalled_duration,
       ]
+    end
+
+    private
+
+    def scale_ns(value_ns, unit)
+      case unit
+      when :float_second
+        value_ns / 1_000_000_000.0
+      when :float_millisecond
+        value_ns / 1_000_000.0
+      when :float_microsecond
+        value_ns / 1000.0
+      when :second
+        value_ns / 1_000_000_000
+      when :millisecond
+        value_ns / 1_000_000
+      when :microsecond
+        value_ns / 1000
+      when :nanosecond
+        value_ns
+      else
+        raise ArgumentError, "unexpected unit: #{unit.inspect}"
+      end
     end
   end
 end

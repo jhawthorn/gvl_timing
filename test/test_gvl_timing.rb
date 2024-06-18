@@ -13,11 +13,11 @@ class TestGVLTiming < Minitest::Test
     sleep 0.1
     timer.stop
 
-    assert_in_delta 100000000, timer.duration, 5000000
-    assert_in_delta 100000000, timer.idle_duration, 5000000
-    assert_in_delta 0, timer.cpu_duration, 5000000
-    assert_in_delta 0, timer.stalled_duration, 5000000
-    assert_in_delta 0, timer.running_duration, 5000000
+    assert_in_delta 100000000, timer.duration_ns, 5000000
+    assert_in_delta 100000000, timer.idle_duration_ns, 5000000
+    assert_in_delta 0, timer.cpu_duration_ns, 5000000
+    assert_in_delta 0, timer.stalled_duration_ns, 5000000
+    assert_in_delta 0, timer.running_duration_ns, 5000000
   end
 
   def test_timing_busy_sleep
@@ -29,11 +29,11 @@ class TestGVLTiming < Minitest::Test
     end
     timer.stop
 
-    assert_in_delta 100000000, timer.duration, 5000000
-    assert_in_delta 100000000, timer.running_duration, 5000000
-    #assert_in_delta 100000000, timer.cpu_duration, 10000000
-    assert_in_delta 0, timer.stalled_duration, 5000000
-    assert_in_delta 0, timer.idle_duration, 5000000
+    assert_in_delta 100000000, timer.duration_ns, 5000000
+    assert_in_delta 100000000, timer.running_duration_ns, 5000000
+    #assert_in_delta 100000000, timer.cpu_duration_ns, 10000000
+    assert_in_delta 0, timer.stalled_duration_ns, 5000000
+    assert_in_delta 0, timer.idle_duration_ns, 5000000
   end
 
   def test_timing_stalled_sleep
@@ -57,13 +57,28 @@ class TestGVLTiming < Minitest::Test
     end
     timer.stop
 
-    assert_in_delta 100000000, timer.duration, 5000000
-    assert_in_delta 100000000, timer.stalled_duration, 5000000
-    assert_in_delta 0, timer.cpu_duration, 5000000
-    assert_in_delta 0, timer.running_duration, 5000000
-    assert_in_delta 0, timer.idle_duration, 5000000
+    assert_in_delta 100000000, timer.duration_ns, 5000000
+    assert_in_delta 100000000, timer.stalled_duration_ns, 5000000
+    assert_in_delta 0, timer.cpu_duration_ns, 5000000
+    assert_in_delta 0, timer.running_duration_ns, 5000000
+    assert_in_delta 0, timer.idle_duration_ns, 5000000
   ensure
     thread&.kill
+  end
+
+  def test_timing_units
+    timer = GVLTiming.measure { sleep 0.1 }
+
+    assert_in_delta 100000000, timer.duration_ns, 5000000
+    assert_in_delta 0.1, timer.duration, 0.005
+    assert_in_delta 0.1, timer.duration(:float_second), 0.005
+    assert_in_delta 100, timer.duration(:float_millisecond), 5
+    assert_in_delta 100_000, timer.duration(:float_microsecond), 5000
+
+    assert_equal 0, timer.duration(:second)
+    assert_in_delta 100, timer.duration(:millisecond), 5
+    assert_in_delta 100_000, timer.duration(:microsecond), 5_000
+    assert_in_delta 100_000_000, timer.duration(:nanosecond), 5_000_000
   end
 
   def test_measure_and_inspect

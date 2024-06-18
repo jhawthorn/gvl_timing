@@ -159,12 +159,12 @@ Init_gvl_timing(void)
     rb_define_method(rb_cTimer, "start", gvl_timer_start, 0);
     rb_define_method(rb_cTimer, "stop", gvl_timer_stop, 0);
 
-    rb_define_method(rb_cTimer, "monotonic_start", gvl_timer_monotonic_start, 0);
-    rb_define_method(rb_cTimer, "monotonic_stop", gvl_timer_monotonic_stop, 0);
-    rb_define_method(rb_cTimer, "cputime_start", gvl_timer_cputime_start, 0);
-    rb_define_method(rb_cTimer, "cputime_stop", gvl_timer_cputime_stop, 0);
+    rb_define_method(rb_cTimer, "monotonic_start_ns", gvl_timer_monotonic_start, 0);
+    rb_define_method(rb_cTimer, "monotonic_stop_ns", gvl_timer_monotonic_stop, 0);
+    rb_define_method(rb_cTimer, "cputime_start_ns", gvl_timer_cputime_start, 0);
+    rb_define_method(rb_cTimer, "cputime_stop_ns", gvl_timer_cputime_stop, 0);
 
-    rb_define_method(rb_cTimer, "running_duration", gvl_timer_running_duration, 0);
-    rb_define_method(rb_cTimer, "stalled_duration", gvl_timer_stalled_duration, 0);
-    rb_define_method(rb_cTimer, "idle_duration", gvl_timer_idle_duration, 0);
+    rb_define_method(rb_cTimer, "running_duration_ns", gvl_timer_running_duration, 0);
+    rb_define_method(rb_cTimer, "stalled_duration_ns", gvl_timer_stalled_duration, 0);
+    rb_define_method(rb_cTimer, "idle_duration_ns", gvl_timer_idle_duration, 0);
 }
