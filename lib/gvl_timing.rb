@@ -31,7 +31,7 @@ module GVLTiming
     [
       :duration, :cpu_duration,
       :monotonic_start, :monotonic_stop,
-      :cputime_start, :cputime_start,
+      :cputime_start, :cputime_stop,
       :running_duration, :stalled_duration, :idle_duration
     ].each do |name|
       class_eval <<~RUBY
