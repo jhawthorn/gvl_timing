@@ -26,7 +26,7 @@ struct gvl_timer {
     uint64_t cputime_start;
     uint64_t cputime_stop;
 
-    uint64_t releases_count;
+    uint64_t yields_count;
 
     uint64_t prev_timestamp;
     enum ruby_gvl_state prev_state;
@@ -44,7 +44,7 @@ void record_timing(struct gvl_timer *timer, enum ruby_gvl_state new_state) {
     timer->prev_state = new_state;
 
     if (new_state == GVL_STATE_IDLE) {
-        timer->releases_count++;
+        timer->yields_count++;
     }
 
 }
@@ -157,8 +157,8 @@ VALUE gvl_timer_idle_duration(VALUE obj) {
     return ULL2NUM(get_timer(obj)->timings[GVL_STATE_IDLE]);
 }
 
-VALUE gvl_timer_releases_count(VALUE obj) {
-    return ULL2NUM(get_timer(obj)->releases_count);
+VALUE gvl_timer_yields_count(VALUE obj) {
+    return ULL2NUM(get_timer(obj)->yields_count);
 }
 
 RUBY_FUNC_EXPORTED void
@@ -179,5 +179,5 @@ Init_gvl_timing(void)
     rb_define_method(rb_cTimer, "stalled_duration_ns", gvl_timer_stalled_duration, 0);
     rb_define_method(rb_cTimer, "idle_duration_ns", gvl_timer_idle_duration, 0);
 
-    rb_define_method(rb_cTimer, "releases_count", gvl_timer_releases_count, 0);
+    rb_define_method(rb_cTimer, "yields_count", gvl_timer_yields_count, 0);
 }

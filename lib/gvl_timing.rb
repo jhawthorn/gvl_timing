@@ -41,14 +41,15 @@ module GVLTiming
       RUBY
     end
 
+    alias releases_count yields_count
 
     def inspect
-      "#<#{self.class} total=%.2fs running=%.2fs idle=%.2fs stalled=%.2fs, releases=%d>" % [
+      "#<#{self.class} total=%.2fs running=%.2fs idle=%.2fs stalled=%.2fs yields=%d>" % [
         duration,
         running_duration,
         idle_duration,
         stalled_duration,
-        releases_count,
+        yields_count,
       ]
     end
 
