@@ -84,7 +84,7 @@ class TestGVLTiming < Minitest::Test
 
   def test_measure_and_inspect
     timer = GVLTiming.measure { sleep 0.1 }
-    expected = "#<GVLTiming::Timer total=0.10s running=0.00s idle=0.10s stalled=0.00s, releases=1>"
+    expected = "#<GVLTiming::Timer total=0.10s running=0.00s idle=0.10s stalled=0.00s yields=1>"
     assert_equal expected, timer.inspect
   end
 end
