@@ -10,8 +10,11 @@ module GVLTiming
     def measure
       timer = Timer.new
       timer.start
-      yield
-      timer.stop
+      begin
+        yield
+      ensure
+        timer.stop
+      end
       timer
     end
     alias_method :time, :measure
