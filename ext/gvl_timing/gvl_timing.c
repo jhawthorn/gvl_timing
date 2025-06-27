@@ -46,7 +46,6 @@ void record_timing(struct gvl_timer *timer, enum ruby_gvl_state new_state) {
     if (new_state == GVL_STATE_IDLE) {
         timer->yields_count++;
     }
-
 }
 
 void internal_thread_event_cb(rb_event_flag_t event, const rb_internal_thread_event_data_t *event_data, void *data) {
@@ -81,12 +80,25 @@ void internal_thread_event_cb(rb_event_flag_t event, const rb_internal_thread_ev
     record_timing(timer, new_state);
 }
 
+static size_t gvl_timer_memsize(const void *data) {
+  return sizeof(struct gvl_timer);
+}
+
+static void gvl_timer_free(void *data) {
+  struct gvl_timer *timer = (struct gvl_timer *)data;
+
+  if (timer->running) {
+    rb_internal_thread_remove_event_hook(timer->event_hook);
+  }
+  ruby_xfree(timer);
+}
+
 static const rb_data_type_t gvl_timer_type = {
     .wrap_struct_name = "gvl_timer",
     .function = {
-        //.dmemsize = rb_collector_memsize,
-        //.dmark = collector_mark,
-        //.dfree = collector_free,
+        .dsize = gvl_timer_memsize,
+        .dmark = NULL,
+        .dfree = gvl_timer_free,
     },
 };
 
