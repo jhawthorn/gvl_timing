@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require_relative "gvl_timing/version"
-
 require "gvl_timing/gvl_timing"
 
 module GVLTiming
