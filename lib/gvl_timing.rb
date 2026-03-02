@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "gvl_timing/version"
-require_relative "gvl_timing/gvl_timing"
+require "gvl_timing/gvl_timing"
 
 module GVLTiming
   class Error < StandardError; end
