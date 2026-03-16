@@ -20,9 +20,7 @@ module GVLTiming
     alias_method :time, :measure
   end
 
-  class Timer
-    NANOSECONDS_PER_SECOND_F = 1000000000.0
-
+  module TimingCalculable
     def duration_ns
       monotonic_stop_ns - monotonic_start_ns
     end
@@ -43,8 +41,6 @@ module GVLTiming
         end
       RUBY
     end
-
-    alias releases_count yields_count
 
     def inspect
       "#<#{self.class} total=%.2fs running=%.2fs idle=%.2fs stalled=%.2fs yields=%d>" % [
@@ -78,5 +74,17 @@ module GVLTiming
         raise ArgumentError, "unexpected unit: #{unit.inspect}"
       end
     end
+  end
+
+  class Timer
+    include TimingCalculable
+
+    alias releases_count yields_count
+  end
+
+  class GlobalTimer
+    include TimingCalculable
+
+    alias releases_count yields_count
   end
 end

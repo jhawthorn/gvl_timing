@@ -2,7 +2,7 @@
 
 require "test_helper"
 
-class TestGVLTiming < Minitest::Test
+class TestGVLLocalTiming < Minitest::Test
   def test_that_it_has_a_version_number
     refute_nil ::GVLTiming::VERSION
   end

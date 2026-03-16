@@ -3,6 +3,9 @@
 
 static VALUE rb_mGVLTiming;
 static VALUE rb_cTimer;
+static VALUE rb_cGlobalTimer;
+
+static int thread_storage_key = 0;
 
 static const uint64_t nanoseconds_per_second = 1000000000;
 
@@ -33,8 +36,43 @@ struct gvl_timer {
     VALUE thread;
     rb_internal_thread_event_hook_t *event_hook;
 
+    bool global;
     bool running;
 };
+
+typedef struct {
+    VALUE thread;
+    uint64_t prev_timestamp;
+    enum ruby_gvl_state prev_state;
+} thread_local_state;
+
+static size_t thread_local_state_memsize(const void *data) {
+    return sizeof(thread_local_state);
+}
+
+static const rb_data_type_t thread_local_state_type = {
+    .wrap_struct_name = "GVLTiming::ThreadState",
+    .function = {
+        .dmark = NULL,
+        .dfree = RUBY_DEFAULT_FREE,
+        .dsize = thread_local_state_memsize,
+    },
+    .flags = RUBY_TYPED_FREE_IMMEDIATELY | RUBY_TYPED_WB_PROTECTED,
+};
+
+static inline thread_local_state *GT_LOCAL_STATE(VALUE thread, bool allocate) {
+    thread_local_state *state = rb_internal_thread_specific_get(thread, thread_storage_key);
+
+    if (!state && allocate) {
+        VALUE wrapper = TypedData_Make_Struct(rb_cGlobalTimer, thread_local_state, &thread_local_state_type, state);
+        rb_thread_local_aset(thread, rb_intern("__gvl_timing_thread_state"), wrapper);
+        RB_GC_GUARD(wrapper);
+        rb_internal_thread_specific_set(thread, thread_storage_key, state);
+    }
+    return state;
+}
+
+#define GT_EVENT_LOCAL_STATE(event_data, allocate) GT_LOCAL_STATE(event_data->thread, allocate)
 
 void record_timing(struct gvl_timer *timer, enum ruby_gvl_state new_state) {
     uint64_t timestamp = clock_gettime_ns(CLOCK_MONOTONIC);
@@ -48,6 +86,19 @@ void record_timing(struct gvl_timer *timer, enum ruby_gvl_state new_state) {
     }
 }
 
+void record_global_timing(struct gvl_timer *global_timer, enum ruby_gvl_state new_state, thread_local_state *thread_state) {
+    uint64_t timestamp = clock_gettime_ns(CLOCK_MONOTONIC);
+
+    global_timer->timings[thread_state->prev_state] += (timestamp - thread_state->prev_timestamp);
+
+    thread_state->prev_timestamp = timestamp;
+    thread_state->prev_state = new_state;
+
+    if (new_state == GVL_STATE_IDLE) {
+        global_timer->yields_count++;
+    }
+}
+
 void internal_thread_event_cb(rb_event_flag_t event, const rb_internal_thread_event_data_t *event_data, void *data) {
     struct gvl_timer *timer = data;
 
@@ -58,12 +109,24 @@ void internal_thread_event_cb(rb_event_flag_t event, const rb_internal_thread_ev
     if (!ruby_native_thread_p()) return;
     thread = rb_thread_current();
 #endif
-    if (thread != timer->thread) {
+    if (!timer->global && thread != timer->thread) {
         return;
     }
 
     enum ruby_gvl_state new_state;
     switch (event) {
+      case RUBY_INTERNAL_THREAD_EVENT_STARTED: {
+        if (timer->global) {
+//             The STARTED event is triggered from the parent thread with the GVL held
+//             so we can allocate the struct.
+            thread_local_state *thread_state = GT_EVENT_LOCAL_STATE(event_data, true);
+
+            thread_state->prev_timestamp = clock_gettime_ns(CLOCK_MONOTONIC);
+            thread_state->prev_state = GVL_STATE_RUNNING;
+        }
+        return;
+      }
+      break;
       case RUBY_INTERNAL_THREAD_EVENT_READY:
         new_state = GVL_STATE_STALLED;
         break;
@@ -77,7 +140,15 @@ void internal_thread_event_cb(rb_event_flag_t event, const rb_internal_thread_ev
         return;
     }
 
-    record_timing(timer, new_state);
+    if (timer->global) {
+        thread_local_state *prev_state = GT_EVENT_LOCAL_STATE(event_data, false);
+
+        if (prev_state) {
+            record_global_timing(timer, new_state, prev_state);
+        }
+    } else {
+        record_timing(timer, new_state);
+    }
 }
 
 static size_t gvl_timer_memsize(const void *data) {
@@ -120,6 +191,7 @@ VALUE gvl_timer_start(VALUE obj) {
     timer->cputime_start   = clock_gettime_ns(CLOCK_THREAD_CPUTIME_ID);
 
     timer->thread = rb_thread_current();
+    timer->global = false;
     timer->running = true;
     timer->event_hook = rb_internal_thread_add_event_hook(internal_thread_event_cb, RUBY_INTERNAL_THREAD_EVENT_MASK, timer);
 
@@ -129,10 +201,52 @@ VALUE gvl_timer_start(VALUE obj) {
     return obj;
 }
 
+VALUE gvl_global_timer_start(VALUE obj) {
+    struct gvl_timer *timer = get_timer(obj);
+    timer->monotonic_start = clock_gettime_ns(CLOCK_MONOTONIC);
+
+    timer->global = true;
+    timer->running = true;
+    timer->event_hook = rb_internal_thread_add_event_hook(internal_thread_event_cb, RUBY_INTERNAL_THREAD_EVENT_MASK, timer);
+
+    timer->prev_state = GVL_STATE_RUNNING;
+    timer->prev_timestamp = clock_gettime_ns(CLOCK_MONOTONIC);
+
+    thread_local_state *thread_state = GT_LOCAL_STATE(rb_thread_current(), true);
+
+    thread_state->prev_state = GVL_STATE_RUNNING;
+    thread_state->prev_timestamp = clock_gettime_ns(CLOCK_MONOTONIC);
+
+    return obj;
+}
+
 VALUE gvl_timer_stop(VALUE obj) {
     struct gvl_timer *timer = get_timer(obj);
 
     // Record last interval
+    record_timing(timer, GVL_STATE_RUNNING);
+
+    rb_internal_thread_remove_event_hook(timer->event_hook);
+
+    timer->monotonic_stop = clock_gettime_ns(CLOCK_MONOTONIC);
+    timer->cputime_stop   = clock_gettime_ns(CLOCK_THREAD_CPUTIME_ID);
+    timer->running = false;
+    return obj;
+}
+
+VALUE gvl_global_timer_reset(VALUE obj) {
+    struct gvl_timer *timer = get_timer(obj);
+
+    timer->timings[GVL_STATE_RUNNING] = 0;
+    timer->timings[GVL_STATE_STALLED] = 0;
+    timer->timings[GVL_STATE_IDLE] = 0;
+
+    return obj;
+}
+
+VALUE gvl_global_timer_stop(VALUE obj) {
+    struct gvl_timer *timer = get_timer(obj);
+
     record_timing(timer, GVL_STATE_RUNNING);
 
     rb_internal_thread_remove_event_hook(timer->event_hook);
@@ -178,6 +292,8 @@ VALUE gvl_timer_yields_count(VALUE obj) {
 RUBY_FUNC_EXPORTED void
 Init_gvl_timing(void)
 {
+    thread_storage_key = rb_internal_thread_specific_key_create();
+
     rb_mGVLTiming = rb_define_module("GVLTiming");
     rb_cTimer = rb_define_class_under(rb_mGVLTiming, "Timer", rb_cObject);
     rb_define_alloc_func(rb_cTimer, gvl_timer_alloc);
@@ -194,4 +310,21 @@ Init_gvl_timing(void)
     rb_define_method(rb_cTimer, "idle_duration_ns", gvl_timer_idle_duration, 0);
 
     rb_define_method(rb_cTimer, "yields_count", gvl_timer_yields_count, 0);
+
+    rb_cGlobalTimer = rb_define_class_under(rb_mGVLTiming, "GlobalTimer", rb_cObject);
+    rb_define_alloc_func(rb_cGlobalTimer, gvl_timer_alloc);
+    rb_define_method(rb_cGlobalTimer, "start", gvl_global_timer_start, 0);
+    rb_define_method(rb_cGlobalTimer, "reset", gvl_global_timer_reset, 0);
+    rb_define_method(rb_cGlobalTimer, "stop", gvl_global_timer_stop, 0);
+
+    rb_define_method(rb_cGlobalTimer, "monotonic_start_ns", gvl_timer_monotonic_start, 0);
+    rb_define_method(rb_cGlobalTimer, "monotonic_stop_ns", gvl_timer_monotonic_stop, 0);
+    rb_define_method(rb_cGlobalTimer, "cputime_start_ns", gvl_timer_cputime_start, 0);
+    rb_define_method(rb_cGlobalTimer, "cputime_stop_ns", gvl_timer_cputime_stop, 0);
+
+    rb_define_method(rb_cGlobalTimer, "running_duration_ns", gvl_timer_running_duration, 0);
+    rb_define_method(rb_cGlobalTimer, "stalled_duration_ns", gvl_timer_stalled_duration, 0);
+    rb_define_method(rb_cGlobalTimer, "idle_duration_ns", gvl_timer_idle_duration, 0);
+
+    rb_define_method(rb_cGlobalTimer, "yields_count", gvl_timer_yields_count, 0);
 }
